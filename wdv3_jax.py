@@ -249,12 +249,12 @@ def main(opts: ScriptOptions):
             char_threshold=opts.char_threshold,
         )
 
-      #  print("--------")
-     #   print(f"Caption: {caption}")
-    #    print("--------")
+        print("--------")
+        print(f"Caption: {caption}")
+        print("--------")
         print(f"Tags: {taglist}")
 
-   #     print("--------")
+        print("--------")
   #      print("Ratings:")
  #       for k, v in ratings.items():
 #            print(f"  {k}: {v:.3f}")
