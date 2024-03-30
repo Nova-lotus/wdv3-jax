@@ -161,8 +161,15 @@ def get_tags(
     gen_threshold: float,
     char_threshold: float,
 ):
+    # Ensure probs is a list or array
+    probs = [probs]
+
+    # Check that the length of probs matches the expected length
+    if len(probs[0]) != len(labels.names):
+        raise ValueError("Length of probs does not match length of labels.names")
+
     # Convert indices+probs to labels
-    probs = list(zip(labels.names, probs))
+    probs = list(zip(labels.names, probs[0]))
 
     # First 4 labels are actually ratings
     rating_labels = dict([probs[i] for i in labels.rating])
