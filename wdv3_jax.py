@@ -2,6 +2,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
+import jax
+import jax.numpy as jnp
 
 import flax
 import jax
@@ -207,11 +209,11 @@ class ScriptOptions:
     char_threshold: float = field(default=0.75)
 
 
-def main(opts: ScriptOptions):
+def main(opts: ScriptOptions, batch_size: int = 32):
     repo_id = MODEL_REPO_MAP.get(opts.model)
-    image_path = Path(opts.image_file).resolve()
-    if not image_path.is_file():
-        raise FileNotFoundError(f"Image file not found: {image_path}")
+    image_paths = [Path(p).resolve() for p in opts.image_file]
+    if not all(p.is_file() for p in image_paths):
+        raise FileNotFoundError(f"One or more image files not found.")
 
     print(f"Loading model '{opts.model}' from '{repo_id}'...")
     model, target_size = load_model_hf(repo_id=repo_id)
@@ -219,33 +221,40 @@ def main(opts: ScriptOptions):
     print("Loading tag list...")
     labels: LabelData = load_labels_hf(repo_id=repo_id)
 
-    print("Loading image and preprocessing...")
-    # get image
-    img_input: Image.Image = Image.open(image_path)
-    # ensure image is RGB
-    img_input = pil_ensure_rgb(img_input)
-    # pad to square with white background
-    img_input = pil_pad_square(img_input)
-    img_input = pil_resize(img_input, target_size)
-    # convert to numpy array and add batch dimension
-    inputs = np.array(img_input)
-    inputs = np.expand_dims(inputs, axis=0)
-    # NHWC image RGB to BGR
-    inputs = inputs[..., ::-1]
+    print("Loading images and preprocessing...")
+    inputs = []
+    for image_path in image_paths:
+        img_input: Image.Image = Image.open(image_path)
+        img_input = pil_ensure_rgb(img_input)
+        img_input = pil_pad_square(img_input)
+        img_input = pil_resize(img_input, target_size)
+        img_input = np.array(img_input)
+        img_input = img_input[..., ::-1]  # NHWC image RGB to BGR
+        inputs.append(img_input)
+
+    # Enable GPU acceleration in JAX
+    jax.config.update('jax_platform_name', 'gpu')
 
     print("Running inference...")
-    outputs = model.predict(inputs)
+    batched_inputs = np.array_split(inputs, len(inputs) // batch_size + 1)
+    all_outputs = []
+    for batch in batched_inputs:
+        batch_inputs = jnp.array(batch)
+        outputs = model.predict(batch_inputs)
+        all_outputs.extend(outputs)
 
     print("Processing results...")
-    caption, taglist, ratings, character, general = get_tags(
-        probs=outputs,
-        labels=labels,
-        gen_threshold=opts.gen_threshold,
-        char_threshold=opts.char_threshold,
-    )
+    for i, output in enumerate(all_outputs):
+        image_path = image_paths[i]
+        caption, taglist, ratings, character, general = get_tags(
+            probs=output,
+            labels=labels,
+            gen_threshold=opts.gen_threshold,
+            char_threshold=opts.char_threshold,
+        )
 
-    print("--------")
-    print(f"Caption: {caption}")
+    #print("--------")
+   # print(f"Caption: {caption}")
     print("--------")
     print(f"Tags: {taglist}")
 
@@ -259,10 +268,11 @@ def main(opts: ScriptOptions):
     for k, v in character.items():
         print(f"  {k}: {v:.3f}")
 
-    print("--------")
-    print(f"General tags (threshold={opts.gen_threshold}):")
-    for k, v in general.items():
+    #print("--------")
+    #print(f"General tags (threshold={opts.gen_threshold}):")
+    #for k, v in general.items():
         print(f"  {k}: {v:.3f}")
+        # Print other results if needed
 
     print("Done!")
 
