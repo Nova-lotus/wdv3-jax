@@ -2,11 +2,10 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
-import jax
-import jax.numpy as jnp
 
 import flax
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 from huggingface_hub import hf_hub_download
@@ -203,7 +202,7 @@ def get_tags(
 
 @dataclass
 class ScriptOptions:
-    image_file: Path = field(positional=True)
+    image_file: list[str] = field(positional=True, default_factory=list)
     model: str = field(default="vit")
     gen_threshold: float = field(default=0.35)
     char_threshold: float = field(default=0.75)
@@ -253,25 +252,11 @@ def main(opts: ScriptOptions, batch_size: int = 32):
             char_threshold=opts.char_threshold,
         )
 
-    #print("--------")
-   # print(f"Caption: {caption}")
-    print("--------")
-    print(f"Tags: {taglist}")
-
-    print("--------")
-    print("Ratings:")
-    for k, v in ratings.items():
-        print(f"  {k}: {v:.3f}")
-
-    print("--------")
-    print(f"Character tags (threshold={opts.char_threshold}):")
-    for k, v in character.items():
-        print(f"  {k}: {v:.3f}")
-
-    #print("--------")
-    #print(f"General tags (threshold={opts.gen_threshold}):")
-    #for k, v in general.items():
-        print(f"  {k}: {v:.3f}")
+        print(f"Results for {image_path.name}:")
+        print("--------")
+        print(f"Caption: {caption}")
+        print("--------")
+        print(f"Tags: {taglist}")
         # Print other results if needed
 
     print("Done!")
